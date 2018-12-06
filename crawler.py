@@ -92,8 +92,7 @@ if __name__ == '__main__':
         output(get_profile(args.username), args.output)
     elif args.mode == 'hashtag':
         arg_required('tag')
-        output(
-            get_posts_by_hashtag(args.tag, args.number or 100), args.output)
+        output(get_posts_by_hashtag(args.tag, args.number or 100), args.output)
     elif args.mode == 'posts_discovery':
         arg_required('dump')
         output_posts_info_from_list(args.dump)
