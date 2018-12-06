@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+
+import sys
 from builtins import open
 
-from inscrawler import InsCrawler
-import sys
 import argparse
 import json
 from io import open
+
+from inscrawler import InsCrawler
 
 
 def usage():
@@ -35,6 +37,13 @@ def get_posts_by_hashtag(tag, number):
     return ins_crawler.get_latest_posts_by_tag(tag, number)
 
 
+def output_posts_info_from_list(filename: str):
+    with open(filename, 'rb') as r:
+        posts_list = json.load(r)
+    ins_crawler = InsCrawler()
+    return ins_crawler.get_posts_info_from_list(posts_list)
+
+
 def arg_required(args, fields=[]):
     for field in fields:
         if not getattr(args, field):
@@ -55,7 +64,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Instagram Crawler',
                                      usage=usage())
     parser.add_argument('mode',
-                        help='options: [posts, posts_full, profile, hashtag]')
+                        help='options: [posts, posts_full, profile, hashtag, posts_discovery]')
     parser.add_argument('-n', '--number',
                         type=int,
                         help='number of returned posts')
@@ -64,6 +73,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--tag',
                         help='instagram\'s tag name')
     parser.add_argument('-o', '--output', help='output file name(json format)')
+    parser.add_argument('-d', '--dump', help='input file name (json format)')
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
@@ -84,5 +94,8 @@ if __name__ == '__main__':
         arg_required('tag')
         output(
             get_posts_by_hashtag(args.tag, args.number or 100), args.output)
+    elif args.mode == 'posts_discovery':
+        arg_required('dump')
+        output_posts_info_from_list(args.dump)
     else:
         usage()

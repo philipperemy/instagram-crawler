@@ -1,51 +1,18 @@
 from __future__ import unicode_literals
-from builtins import open
-from selenium.webdriver.common.keys import Keys
 
-from .exceptions import RetryException
-from .browser import Browser
-from .utils import instagram_int
-from .utils import retry
-from .utils import randmized_sleep
-from . import secret
-import json
-import time
 from time import sleep
+
 from tqdm import tqdm
-import os
-import glob
 
-class Logging(object):
-    PREFIX = 'instagram-crawler'
-
-    def __init__(self):
-        try:
-            timestamp  = int(time.time())
-            self.cleanup(timestamp)
-            self.logger = open('/tmp/%s-%s.log' % (Logging.PREFIX, timestamp), 'w')
-            self.log_disable = False
-        except:
-            self.log_disable = True
-
-    def cleanup(self, timestamp):
-        days = 86400 * 7
-        days_ago_log = '/tmp/%s-%s.log' % (Logging.PREFIX, timestamp - days)
-        for log in glob.glob("/tmp/instagram-crawler-*.log"):
-            if log < days_ago_log:
-                os.remove(log)
-
-    def log(self, msg):
-        if self.log_disable: return
-
-        self.logger.write(msg + '\n')
-        self.logger.flush()
-
-    def __del__(self):
-        if self.log_disable: return
-        self.logger.close()
+from . import secret
+from .browser import Browser
+from .exceptions import RetryException
+from .utils import instagram_int
+from .utils import randmized_sleep
+from .utils import retry
 
 
-class InsCrawler(Logging):
+class InsCrawler:
     URL = 'https://www.instagram.com'
     RETRY_LIMIT = 10
 
@@ -104,14 +71,23 @@ class InsCrawler(Logging):
         self._dismiss_login_prompt()
 
         if detail:
-            return self._get_posts_full(number)
+            return self.get_post_info(number)
         else:
             return self._get_posts(number)
+
+    def get_posts_info_from_list(self, posts_list):
+        for post in posts_list:
+            post_url = post['key']
+            self.log(post_url)
+            self.get_post_info(post_url)
 
     def get_latest_posts_by_tag(self, tag, num):
         url = '%s/explore/tags/%s/' % (InsCrawler.URL, tag)
         self.browser.get(url)
         return self._get_posts(num)
+
+    def log(self, msg):
+        print(msg)
 
     def auto_like(self, tag='', maximum=1000):
         self.login()
@@ -138,84 +114,66 @@ class InsCrawler(Logging):
             else:
                 break
 
-    def _get_posts_full(self, num):
-        @retry()
-        def check_next_post(cur_key):
-            ele_a_datetime = browser.find_one('.eo2As .c-Yi7')
-            next_key = ele_a_datetime.get_attribute('href')
-            if cur_key == next_key:
-                raise RetryException()
+    def get_post_info(self, url='https://www.instagram.com/p/BqtAVxYHO6V/'):
 
         browser = self.browser
         browser.implicitly_wait(1)
-        ele_post = browser.find_one('.v1Nh3 a')
-        ele_post.click()
-        dict_posts = {}
 
-        pbar = tqdm(total=num)
-        pbar.set_description('fetching')
-        cur_key = None
+        browser.get(url)
 
-        # Fetching all posts
-        for _ in range(num):
-            check_next_post(cur_key)
-            dict_post = {}
+        dict_post = {}
 
-            # Fetching datetime and url as key
-            ele_a_datetime = browser.find_one('.eo2As .c-Yi7')
-            cur_key = ele_a_datetime.get_attribute('href')
-            dict_post['key'] = cur_key
+        # Fetching datetime and url as key
+        ele_a_datetime = browser.find_one('.eo2As .c-Yi7')
+        cur_key = ele_a_datetime.get_attribute('href')
+        dict_post['key'] = cur_key
 
-            ele_datetime = browser.find_one('._1o9PC', ele_a_datetime)
-            datetime = ele_datetime.get_attribute('datetime')
-            dict_post['datetime'] = datetime
+        ele_datetime = browser.find_one('._1o9PC', ele_a_datetime)
+        datetime = ele_datetime.get_attribute('datetime')
+        dict_post['datetime'] = datetime
 
-            # Fetching all img
-            content = None
-            img_urls = set()
-            while True:
-                ele_imgs = browser.find('._97aPb img', waittime=10)
-                for ele_img in ele_imgs:
-                    if content is None:
-                        content = ele_img.get_attribute('alt')
-                    img_urls.add(ele_img.get_attribute('src'))
+        dict_post['username'] = browser.find_one('.FPmhX').text
 
-                next_photo_btn = browser.find_one('._6CZji .coreSpriteRightChevron')
-                if next_photo_btn:
-                    next_photo_btn.click()
-                    sleep(0.2)
-                else:
-                    break
+        try:
+            dict_post['location'] = browser.find_one('.O4GlU').text
+        except Exception:
+            pass
 
-            dict_post['content'] = content
-            dict_post['img_urls'] = list(img_urls)
+        # Fetching all img
+        content = None
+        img_urls = set()
+        while True:
+            ele_imgs = browser.find('._97aPb img', waittime=10)
+            for ele_img in ele_imgs:
+                if content is None:
+                    content = ele_img.get_attribute('alt')
+                img_urls.add(ele_img.get_attribute('src'))
 
-            # Fetching comments
-            ele_comments = browser.find('.eo2As .gElp9')[1:]
-            comments = []
-            for els_comment in ele_comments:
-                author = browser.find_one('.FPmhX', els_comment).text
-                comment = browser.find_one('span', els_comment).text
-                comments.append({
-                    'author': author,
-                    'comment': comment,
-                })
+            next_photo_btn = browser.find_one('._6CZji .coreSpriteRightChevron')
+            if next_photo_btn:
+                next_photo_btn.click()
+                sleep(0.2)
+            else:
+                break
 
-            if comments:
-                dict_post['comments'] = comments
+        dict_post['content'] = content
+        dict_post['img_urls'] = list(img_urls)
 
-            self.log(json.dumps(dict_post, ensure_ascii=False))
-            dict_posts[browser.current_url] = dict_post
+        # Fetching comments
+        ele_comments = browser.find('.eo2As .gElp9')[1:]
+        comments = []
+        for els_comment in ele_comments:
+            author = browser.find_one('.FPmhX', els_comment).text
+            comment = browser.find_one('span', els_comment).text
+            comments.append({
+                'author': author,
+                'comment': comment,
+            })
 
-            pbar.update(1)
-            left_arrow = browser.find_one('.HBoOv')
-            if left_arrow:
-                left_arrow.click()
+        if comments:
+            dict_post['comments'] = comments
 
-        pbar.close()
-        posts = list(dict_posts.values())
-        posts.sort(key=lambda post: post['datetime'], reverse=True)
-        return posts[:num]
+        return dict_post
 
     def _get_posts(self, num):
         '''
@@ -233,6 +191,8 @@ class InsCrawler(Logging):
 
         def start_fetching(pre_post_num, wait_time):
             ele_posts = browser.find('.v1Nh3 a')
+            # p1 = self.get_post_info('https://www.instagram.com/p/BqtAVxYHO6V/')
+            # p2 = self.get_post_info('https://www.instagram.com/p/BrBiewTgPiA/')
             for ele in ele_posts:
                 key = ele.get_attribute('href')
                 if key not in key_set:
@@ -267,11 +227,9 @@ class InsCrawler(Logging):
             pre_post_num = post_num
 
             loading = browser.find_one('.W1Bne')
-            if (not loading and wait_time > TIMEOUT/2):
+            if (not loading and wait_time > TIMEOUT / 2):
                 break
 
         pbar.close()
         print('Done. Fetched %s posts.' % (min(len(posts), num)))
         return posts[:num]
-
-
