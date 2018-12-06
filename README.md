@@ -15,9 +15,20 @@ This crawler could fail due to updates on instagram’s website. If you encounte
 ## Crawler
 ### Usage
 ```
+usage:
+        python crawler.py posts -u cal_foodie -n 100 -o ./output
+        python crawler.py posts_full -u cal_foodie -n 100 -o ./output
+        python crawler.py profile -u cal_foodie -o ./output
+        python crawler.py hashtag -t taiwan -o ./output
+
+        The default number for fetching posts via hashtag is 100.
+
+
+Instagram Crawler
+
 positional arguments:
-  mode
-    options: [posts, posts_full, profile, hashtag]
+  mode                  options: [posts, posts_full, profile, hashtag,
+                        posts_discovery]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -28,6 +39,8 @@ optional arguments:
   -t TAG, --tag TAG     instagram's tag name
   -o OUTPUT, --output OUTPUT
                         output file name(json format)
+  -d DUMP, --dump DUMP  input file name (json format)
+  --debug
 ```
 
 
